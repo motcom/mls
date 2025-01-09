@@ -5,15 +5,57 @@ use term_size;
 /// ワイド表示時のスペース
 const WIDE_ADD_SPACE:i32 = 3;
 
-/// ワイド表示時のスペース
-///
+
+/// ターミナルの幅を取得
 /// # Returns
-/// * `i32` - ターミナルの幅
-fn get_term_width() -> i32 {
-   if let Some(v) = (width, _) = term_size::dimensions().unwrap();
-   width as i32
+/// * `Result<i32,()>` - ターミナルの幅
+fn get_term_width() -> Result<i32,()> {
+   let term_size = term_size::dimensions();
+
+   if let Some((width, _)) = term_size {
+      Ok(width as i32)
+   } else {
+      Err(())
+   }
 }
 
+/// 文字列ベクターの最大長を取得
+/// # Arguments
+/// * `strings` - 文字列ベクタ
+///
+/// # Returns
+/// * `i32` - 最大長
+fn get_string_max_length(strings:&Vec<String>)-> i32{
+   let string_max_width = strings.iter().map(|s| s.len() as i32).max(); 
+   if let Some(max) = string_max_width {
+      max
+   } else {
+      0
+   }
+}
+
+
+fn debug_exec()
+{
+   // string vector test data
+   let mut strings = Vec::<String>::new();
+   strings.push("test".to_string());
+   strings.push("testtest".to_string());
+   strings.push("testtesttest".to_string());
+
+
+   if let Ok(width) = get_term_width() {
+
+      let max_filename_length = get_string_max_length(&strings) + WIDE_ADD_SPACE;
+      let separate_nums =  width / max_filename_length;
+      print!("最大ファイル名の長さ:{}",max_filename_length);
+      println!("ターミナルの幅:{}",width);
+      println!("分割個数:{}",separate_nums);
+
+   } else {
+      println!("ターミナルの幅が取得できませんでした");
+   }
+}
 
 fn main() {
    if DEBUG {
@@ -23,12 +65,6 @@ fn main() {
    }
 }
 
-fn debug_exec()
-{
-   println!("terminal:width{}",get_term_width());
-   
-
-}
 
 /// mainの実行
 fn main_exec()
