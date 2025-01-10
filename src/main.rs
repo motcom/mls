@@ -1,61 +1,14 @@
-const DEBUG:bool = true;
+const DEBUG:bool = false;
 use clap::{value_parser, Arg, ArgAction, ArgMatches, Command};
 use term_size;
 
-/// ワイド表示時のスペース
-const WIDE_ADD_SPACE:i32 = 3;
 
-
-/// ターミナルの幅を取得
-/// # Returns
-/// * `Result<i32,()>` - ターミナルの幅
-fn get_term_width() -> Result<i32,()> {
-   let term_size = term_size::dimensions();
-
-   if let Some((width, _)) = term_size {
-      Ok(width as i32)
-   } else {
-      Err(())
-   }
-}
-
-/// 文字列ベクターの最大長を取得
-/// # Arguments
-/// * `strings` - 文字列ベクタ
-///
-/// # Returns
-/// * `i32` - 最大長
-fn get_string_max_length(strings:&Vec<String>)-> i32{
-   let string_max_width = strings.iter().map(|s| s.len() as i32).max(); 
-   if let Some(max) = string_max_width {
-      max
-   } else {
-      0
-   }
-}
-
-
+// Debug Space --------------------------
 fn debug_exec()
 {
-   // string vector test data
-   let mut strings = Vec::<String>::new();
-   strings.push("test".to_string());
-   strings.push("testtest".to_string());
-   strings.push("testtesttest".to_string());
-
-
-   if let Ok(width) = get_term_width() {
-
-      let max_filename_length = get_string_max_length(&strings) + WIDE_ADD_SPACE;
-      let separate_nums =  width / max_filename_length;
-      print!("最大ファイル名の長さ:{}",max_filename_length);
-      println!("ターミナルの幅:{}",width);
-      println!("分割個数:{}",separate_nums);
-
-   } else {
-      println!("ターミナルの幅が取得できませんでした");
-   }
+   println!("debug");
 }
+// --------------------------------------
 
 fn main() {
    if DEBUG {
@@ -69,10 +22,10 @@ fn main() {
 /// mainの実行
 fn main_exec()
 {
-   let matches:ArgMatches = Command::new("mls")
+   let matches:ArgMatches = Command::new("l")
       .author("mochizuki")
       .version("0.1.0")
-      .about("mls command")
+      .about("l command")
       .arg(
          Arg::new("path")
          .help("path")
@@ -112,6 +65,13 @@ fn main_exec()
       |path| path.clone(),
       );
 
+   if std::path::Path::new(&serch_dir).exists() == false {
+      println!("{}","Error: パスが存在しません");
+      return;
+   }
+
+   
+
    //　引数による条件分岐
    let is_full      = matches.get_flag("full") ;
    let is_recursive = matches.get_flag("recursive") ;
@@ -122,7 +82,7 @@ fn main_exec()
                // ls -r
                let files = get_recursive_files(serch_dir);
                for file in files {
-                  println!("{}",ceil_path(file));
+                  println!("{}",file);
                }
             },
       (false, true, false) => {
@@ -134,7 +94,12 @@ fn main_exec()
                                },
       (false, false, true) => {
          // ls -w
-         print!("未実装");
+         let files = get_dir_files(serch_dir);
+         if let Ok(width) = get_term_width() {
+            wide_line_print(&files,width);
+         } else {
+            println!("ターミナルの幅が取得できませんでした");
+         }
       },
       (false,false, false) => {
          let mut tmp_files = Vec::<String>::new();
@@ -164,17 +129,17 @@ fn get_recursive_files(path:String)-> Vec<String>{
    let mut files = Vec::<String>::new();
    fn get_recursive_func(path:String, files:&mut Vec<String>){
       let entries = std::fs::read_dir(path)
-         .expect("Error: failed to read directory");
+         .expect("Error: ディレクトリの読み込みに失敗");
       for entry in entries {
          let entry = entry
-            .expect("Error: failed to get entry");
+            .expect("Error: エントリーの取得に失敗");
          if entry.path().is_dir(){
            get_recursive_func(entry.path().to_string_lossy().to_string(),files) 
          }
 
          let path = entry.path();
          let path = path.to_str()
-            .expect("Error: failed to convert path to string");
+            .expect("Error: パスから文字列への変換に失敗");
          files.push(path.to_string());
       }
 
@@ -190,19 +155,17 @@ fn get_recursive_files(path:String)-> Vec<String>{
 ///
 /// # Returns
 /// * `String` - ファイル名
-
 fn ceil_path(path:String)-> String{
    let path = std::path::Path::new(&path); 
    if path.is_dir(){
-      let dir_name = path.file_name().expect("Error: failed to get file name")
+      let dir_name = path.file_name().expect("Error: ファイル名の取得に失敗")
          .to_string_lossy().to_string();
       return format!("[{}]",dir_name); 
       
    } else{
    
-   let file_name = path.file_name().expect("Error: failed to get file name")
+   let file_name = path.file_name().expect("Error:　ファイル名の取得に失敗")
       .to_string_lossy().to_string();
-
       return file_name 
    }
 
@@ -218,15 +181,15 @@ fn get_dir_files(dir:String) -> Vec<String> {
    let mut files = Vec::new();
 
    let entries = std::fs::read_dir(dir)
-      .expect("Error: failed to read directory");
+      .expect("Error:  ディレクトリの読み込みに失敗");
 
    for entry in entries {
       let entry = entry
-         .expect("Error: failed to get entry");
+         .expect("Error: エントリーの取得に失敗");
 
       let path = entry.path();
       let path = path.to_str()
-         .expect("Error: failed to convert path to string");
+         .expect("Error: パスから文字列への変換に失敗");
 
       files.push(path.to_string());
    }
@@ -238,10 +201,59 @@ fn get_dir_files(dir:String) -> Vec<String> {
 /// * `String` - カレントディレクトリ
 fn get_current_dir() -> String {
    let current_dir = std::env::current_dir()
-      .expect("Error: failed to get current directory");
+      .expect("Error: カレントディレクトリの取得に失敗"); 
    let current_dir = current_dir
-      .to_str().expect("Error: failed to convert current directory to string");
+      .to_str().expect("Error: カレントディレクトリから文字列への変換に失敗");
    return current_dir.to_string(); 
 
+}
+
+/// ターミナルの幅を取得
+/// # Returns
+/// * `Result<i32,()>` - ターミナルの幅
+fn get_term_width() -> Result<i32,()> {
+   let term_size = term_size::dimensions();
+
+   if let Some((width, _)) = term_size {
+      Ok(width as i32)
+   } else {
+      Err(())
+   }
+}
+
+/// 文字列ベクターの最大長を取得
+/// # Arguments
+/// * `strings` - 文字列ベクタ
+///
+/// # Returns
+/// * `i32` - 最大長
+fn get_string_max_length(strings:&Vec<String>)-> i32{
+   let string_max_width = strings.iter().map(|s| s.len() as i32).max(); 
+   if let Some(max) = string_max_width {
+      max
+   } else {
+      0
+   }
+}
+
+/// ワイド表示
+/// # Arguments
+/// * `file_name_lst` - ファイル名リスト
+/// * `width` - 幅
+
+fn wide_line_print(file_name_lst:&Vec<String>,width:i32){
+
+   /// ワイド表示時のスペース
+   const WIDE_ADD_SPACE:i32 = 4;
+   let max_filename_length = get_string_max_length(&file_name_lst) + WIDE_ADD_SPACE;
+   let separate_nums =  width / max_filename_length;
+
+   file_name_lst.iter().enumerate().for_each(|(i,file_name)|{
+      // iがseparate_numsの倍数の時に改行
+      if i % separate_nums as usize == 0 {
+         print!("\n");
+      }
+      print!("{:width$}",ceil_path(file_name.to_string()),width=max_filename_length as usize);
+   });
 }
 
